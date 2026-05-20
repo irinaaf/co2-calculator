@@ -7,6 +7,7 @@ import { PlaceInput } from "@/components/PlaceInput";
 import { LegBreakdown } from "@/components/LegBreakdown";
 import { CarScenario } from "@/components/CarScenario";
 import { BicycleScenario } from "@/components/BicycleScenario";
+import { FerryCrossingsInfo } from "@/components/FerryCrossingsInfo";
 import { exportCsv, exportCsrdText } from "@/lib/export";
 import { formatCo2, formatDuration } from "@/lib/emissions";
 
@@ -414,6 +415,10 @@ export default function Home() {
                     {data.routingProvider === "google" ? "Google Maps" :
                      data.routingProvider === "osrm" ? "OSRM / OpenStreetMap" : "estimated"}
                   </p>
+                  {/* Ferry info for car — shows CO₂ per car as reference */}
+                  {(data.ferryCrossings?.length ?? 0) > 0 && (
+                    <FerryCrossingsInfo crossings={data.ferryCrossings} mode="car" />
+                  )}
                 </div>
               )}
 
@@ -423,15 +428,23 @@ export default function Home() {
                   style={{ background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.06), 0 0 0 1px hsl(220,8%,90%)" }}>
                   <SectionLabel>Car + public transport (Park &amp; Ride)</SectionLabel>
                   <LegBreakdown journey={combinedScenario.journey} index={0} isBest={false} badge="P+R" />
+                  {(data.ferryCrossings?.length ?? 0) > 0 && (
+                    <FerryCrossingsInfo crossings={data.ferryCrossings} mode="transit" />
+                  )}
                 </div>
               )}
 
               {/* ── SECTION 4: Bicycle ───────────────────────────── */}
-              {bicycleScenario?.bicycleRoute && (
+              {/* Show only when bicycle is NOT already shown in Private car section (route > 25 km) */}
+              {bicycleScenario?.bicycleRoute &&
+               !carScenario?.carVariants?.some((v) => v.label === "Bicycle") && (
                 <div className="rounded-2xl p-6"
                   style={{ background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.06), 0 0 0 1px hsl(220,8%,90%)" }}>
                   <SectionLabel>Bicycle</SectionLabel>
                   <BicycleScenario data={bicycleScenario.bicycleRoute} />
+                  {(data.ferryCrossings?.length ?? 0) > 0 && (
+                    <FerryCrossingsInfo crossings={data.ferryCrossings} mode="transit" />
+                  )}
                 </div>
               )}
 

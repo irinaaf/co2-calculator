@@ -56,6 +56,15 @@ function modeLabel(leg: LegResult): string {
 
 // ─────────────────────────────────────────────────────────────
 
+// Format exact duration from seconds — no rounding artifacts
+function fmtSeconds(seconds: number): string {
+  const totalMin = Math.floor(seconds / 60);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  if (h === 0) return `${m} min`;
+  return `${h}h ${String(m).padStart(2, "0")}m`;
+}
+
 // Format departure time: "Mon 20 May · 10:35"
 function fmtDeparture(iso?: string): string | null {
   if (!iso) return null;
@@ -64,6 +73,7 @@ function fmtDeparture(iso?: string): string | null {
   return d.toLocaleString("en-GB", {
     weekday: "short", day: "numeric", month: "short",
     hour: "2-digit", minute: "2-digit", hour12: false,
+    timeZone: "Europe/Oslo",
   });
 }
 
@@ -105,7 +115,7 @@ export function LegBreakdown({ journey, index, isBest, badge }: Props) {
             {formatCo2(totalCo2Kg)}
           </span>
           <span className="text-xs ml-2" style={{ color: "hsl(220,12%,40%)" }}>
-            {formatDuration(durationMinutes)}
+            {journey.durationSeconds ? fmtSeconds(journey.durationSeconds) : formatDuration(durationMinutes)}
           </span>
           {journey.departureTime && (
             <div className="text-xs mt-0.5" style={{ color: "hsl(220,8%,55%)" }}>

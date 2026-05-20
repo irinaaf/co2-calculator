@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { geocodeOne, fetchJourneysWideWindow, fetchBicycleRoute } from "@/lib/entur";
 import { getRoadDistance } from "@/lib/routing";
+import { detectFerryCrossingsFromPoints, type FerryCrossing } from "@/lib/ferries";
 import {
   calcJourneyResult,
   MODES,
@@ -77,6 +78,8 @@ export interface CalculateResponse {
   scenarios: Scenario[];
   /** Transport modes not available on this route (e.g. ["flight", "train"]) */
   unavailableModes: string[];
+  /** Ferry crossings detected on this route — informational only, not added to CO₂ total */
+  ferryCrossings: FerryCrossing[];
   error?: string;
 }
 
@@ -214,7 +217,20 @@ export default async function handler(
 
   let departure: Date;
   try {
-    departure = dateTime ? new Date(dateTime) : new Date(Date.now() + 3_600_000);
+    if (dateTime) {
+      // datetime-local sends "YYYY-MM-DDTHH:MM" without timezone.
+      // Treat it as Norway time (Europe/Oslo = UTC+1 in winter, UTC+2 in summer).
+      // Append ":00" and let Intl resolve the offset, then rebuild as UTC.
+      const local = new Date(dateTime + ":00");
+      // Get Norway offset in minutes at that moment
+      const formatter = new Intl.DateTimeFormat("en", { timeZone: "Europe/Oslo", timeZoneName: "shortOffset" });
+      const offsetStr = formatter.formatToParts(local).find((p) => p.type === "timeZoneName")?.value ?? "GMT+2";
+      const offsetMatch = offsetStr.match(/GMT([+-])(\d+)/);
+      const offsetHours = offsetMatch ? parseInt(offsetMatch[2]) * (offsetMatch[1] === "+" ? 1 : -1) : 2;
+      departure = new Date(local.getTime() - offsetHours * 3_600_000);
+    } else {
+      departure = new Date(Date.now() + 3_600_000);
+    }
     if (isNaN(departure.getTime())) throw new Error("bad date");
   } catch {
     departure = new Date(Date.now() + 3_600_000);
@@ -248,12 +264,30 @@ export default async function handler(
       departure,
       4,  // ±4 hours window
       2,  // step 2 hours
-      6   // up to 6 unique patterns
+      9   // up to 9 unique — ensures 2-3 ground options after air filter
     );
 
     const transitJourneys = rawJourneys
       .map((j) => calcJourneyResult(j, days, j.queryDateTime))
       .sort((a, b) => a.totalCo2Kg - b.totalCo2Kg);
+
+    // Replace generic "Origin"/"Destination" placeholders from Entur
+    // with real display names from the geocoder.
+    // Entur returns these placeholders for coordinate-based (non-stop) queries.
+    const fromLabel = fromPoint.displayName.split(",")[0].trim();
+    const toLabel   = toPoint.displayName.split(",")[0].trim();
+    transitJourneys.forEach((journey) => {
+      journey.legs.forEach((leg, idx) => {
+        if (leg.fromName === "Origin" || leg.fromName === "origin")
+          leg.fromName = fromLabel;
+        if (leg.toName === "Origin" || leg.toName === "origin")
+          leg.toName = fromLabel;
+        if (leg.fromName === "Destination" || leg.fromName === "destination")
+          leg.fromName = toLabel;
+        if (leg.toName === "Destination" || leg.toName === "destination")
+          leg.toName = toLabel;
+      });
+    });
 
     const bikeResult = await bicyclePromise;
 
@@ -268,17 +302,15 @@ export default async function handler(
       scenarios.push({
         type: "transit",
         title: "Public transport only",
-        subtitle: best.legs.map((l) => l.emoji).join(" + ") +
-          ` · ${best.durationMinutes} min · ${best.legs.length} legs`,
+        subtitle: best.legs.map((l) => l.mode).filter((m) => m !== "foot").join(" + ") +
+          ` · ${best.durationMinutes} min`,
         journey: best,
-        // Extra alternates attached so UI can show them
       });
-      // If there are additional transit options (different times/routes)
       transitJourneys.slice(1).forEach((j, i) => {
         scenarios.push({
           type: "transit",
           title: `Public transport — option ${i + 2}`,
-          subtitle: j.legs.map((l) => l.emoji).join(" + ") +
+          subtitle: j.legs.map((l) => l.mode).filter((m) => m !== "foot").join(" + ") +
             ` · ${j.durationMinutes} min`,
           journey: j,
         });
@@ -310,6 +342,7 @@ export default async function handler(
         type: "combined",
         title: "Car + Public transport (P+R)",
         subtitle: `Drive to station · then ${transitJourneys[0].legs.map((l) => l.emoji).join(" + ")}`,
+        subtitle: `Drive to station · then ${transitJourneys[0].legs.filter((l) => l.mode !== "foot").map((l) => l.mode).join(" + ")}`,
         journey: combined,
       });
     }
@@ -357,6 +390,12 @@ export default async function handler(
       }
     }
 
+    // Detect ferry crossings for informational display
+    const ferryCrossings = detectFerryCrossingsFromPoints(
+      fromPoint.lat, fromPoint.lon,
+      toPoint.lat, toPoint.lon
+    );
+
     return res.status(200).json({
       from: fromPoint,
       to: toPoint,
@@ -367,6 +406,7 @@ export default async function handler(
       unavailableModes: transitJourneys.length > 0
         ? detectUnavailable(transitJourneys)
         : ["train", "flight"],
+      ferryCrossings,
     });
 
   } catch (err: unknown) {

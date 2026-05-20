@@ -238,7 +238,8 @@ export interface LegResult {
   modeLabel: string;
   emoji: string;
   distanceKm: number;
-  durationMinutes: number;
+  durationMinutes: number;   // rounded to nearest minute (for display)
+  durationSeconds: number;   // exact value from Entur (for calculations)
   co2Kg: number;
   co2PerKm: number;
   operatorName: string | null;
@@ -319,6 +320,7 @@ export function calcJourneyResult(
 
   return {
     durationMinutes: Math.round(option.durationSeconds / 60),
+    durationSeconds: option.durationSeconds,
     totalCo2Kg,
     annualCo2Kg: parseFloat((totalCo2Kg * 2 * workDaysPerYear).toFixed(1)),
     legs,
@@ -383,6 +385,6 @@ export function formatDuration(minutes: number): string {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
   if (h === 0) return `${m} min`;
-  if (m === 0) return `${h}h`;
-  return `${h}h ${String(m).padStart(2, "0")}`;
+  // Always show both hours and minutes — no rounding, no "3h" without minutes
+  return `${h}h ${String(m).padStart(2, "0")}m`;
 }
