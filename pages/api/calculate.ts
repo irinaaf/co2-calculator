@@ -174,6 +174,7 @@ function buildCombinedJourney(
     emoji: "⚡",
     distanceKm: carLegKm,
     durationMinutes: durCarMins,
+    durationSeconds: durCarMins * 60,
     co2Kg: co2CarLeg,
     co2PerKm: evMode.co2PerKm,
     operatorName: null,
@@ -189,6 +190,7 @@ function buildCombinedJourney(
 
   return {
     durationMinutes: totalDur,
+    durationSeconds: totalDur * 60,
     totalCo2Kg: totalCo2,
     annualCo2Kg: parseFloat((totalCo2 * 2 * workDays).toFixed(1)),
     legs: allLegs,
@@ -216,7 +218,7 @@ type ApiResult = CalculateResponse | { error: string };
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse<ApiResult>
+  res: NextApiResponse
 ) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -300,11 +302,11 @@ export default async function handler(
     const fromLabel = fromPoint.displayName.split(",")[0].trim();
     const toLabel   = toPoint.displayName.split(",")[0].trim();
 
-    function replacePlaceholder(name: string): string {
+    const replacePlaceholder = (name: string): string => {
       if (name === "Origin" || name === "origin") return fromLabel;
       if (name === "Destination" || name === "destination") return toLabel;
       return name;
-    }
+    };
 
     const processedJourneys = transitJourneys.map((journey) => ({
       ...journey,
