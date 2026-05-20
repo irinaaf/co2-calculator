@@ -6,7 +6,6 @@ import { formatCo2, formatDuration } from "@/lib/emissions";
 // ─────────────────────────────────────────────────────────────────
 
 export function exportCsv(
-  _comparison: unknown[],   // kept for signature compat, not used
   journeys: JourneyResult[],
   from: string,
   to: string,
@@ -69,7 +68,6 @@ export function exportCsv(
 // ─────────────────────────────────────────────────────────────────
 
 export function exportCsrdText(
-  _comparison: unknown[],   // kept for signature compat, not used
   journeys: JourneyResult[],
   from: string,
   to: string,

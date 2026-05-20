@@ -181,8 +181,7 @@ function haversineKm(
 function routeCrossesFerry(
   fromLat: number, fromLon: number,
   toLat: number,   toLon: number,
-  ferry: FerryCrossing,
-  maxTerminalKm = 25
+  ferry: FerryCrossing
 ): boolean {
   const [t1, t2] = ferry.terminals;
   const routeLen = haversineKm(fromLat, fromLon, toLat, toLon);
@@ -190,6 +189,11 @@ function routeCrossesFerry(
 
   // Route must be meaningfully longer than the ferry crossing itself
   if (routeLen < ferryLen * 1.2) return false;
+
+  // Catchment radius scales with the ferry length — longer crossings draw
+  // travellers from further away. Floor of 40 km covers urban ferries where
+  // the city centre may be 30–40 km from the terminal (e.g. Stavanger→Mortavika).
+  const maxTerminalKm = Math.max(40, ferryLen * 1.5);
 
   const dF1 = haversineKm(fromLat, fromLon, t1[0], t1[1]);
   const dF2 = haversineKm(fromLat, fromLon, t2[0], t2[1]);

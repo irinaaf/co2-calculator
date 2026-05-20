@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Head from "next/head";
 import { Car, Plane, Leaf, Clock, TrainFront, Ship, Bus, Shuffle, Info, X } from "lucide-react";
 import type { CalculateResponse } from "./api/calculate";
@@ -91,12 +91,12 @@ export default function Home() {
 
   function handleExportCsv() {
     if (!data) return;
-    exportCsv([], data.scenarios.flatMap((s) => s.journey ? [s.journey] : []),
+    exportCsv(data.scenarios.flatMap((s) => s.journey ? [s.journey] : []),
       data.from.displayName, data.to.displayName, data.distanceKm, workDays);
   }
   function handleCsrd() {
     if (!data) return;
-    const text = exportCsrdText([], data.scenarios.flatMap((s) => s.journey ? [s.journey] : []),
+    const text = exportCsrdText(data.scenarios.flatMap((s) => s.journey ? [s.journey] : []),
       data.from.displayName, data.to.displayName, data.distanceKm, workDays);
     setCsrdText(text);
   }
@@ -151,9 +151,9 @@ export default function Home() {
     if (modes.includes("bus"))   return "bus";
     return "transit";
   }
-  const bestTransitMode = dominantMode(bestJourney);
+  const bestTransitMode = useMemo(() => dominantMode(bestJourney), [bestJourney]);
 
-  const winnerBadge = carIsOverallBest
+  const winnerBadge = useMemo(() => carIsOverallBest
     ? { icon: <Car size={11} strokeWidth={1.8} />, label: `${bestCarVariant?.label} is lowest CO₂`, bg: "hsl(150,24%,86%)", color: "hsl(150,30%,30%)" }
     : bestIsAir
     ? { icon: <Plane size={11} strokeWidth={1.8} />, label: "via flight", bg: "hsl(40,80%,92%)", color: "hsl(40,60%,35%)" }
@@ -163,7 +163,8 @@ export default function Home() {
     ? { icon: <Ship size={11} strokeWidth={1.8} />, label: "Ferry route", bg: "hsl(210,30%,92%)", color: "hsl(210,35%,35%)" }
     : bestTransitMode === "bus"
     ? { icon: <Bus size={11} strokeWidth={1.8} />, label: "Bus is lowest CO₂", bg: "hsl(220,8%,92%)", color: "hsl(220,12%,40%)" }
-    : { icon: <TrainFront size={11} strokeWidth={1.8}/>, label: "Public transport is lowest CO₂", bg: "hsl(150,24%,86%)", color: "hsl(150,30%,30%)" };
+    : { icon: <TrainFront size={11} strokeWidth={1.8}/>, label: "Public transport is lowest CO₂", bg: "hsl(150,24%,86%)", color: "hsl(150,30%,30%)" },
+  [carIsOverallBest, bestCarVariant, bestIsAir, bestIsCombined, bestTransitMode]);
 
   return (
     <>
@@ -409,7 +410,7 @@ export default function Home() {
                       ? "Private car & active modes"
                       : "Private car"}
                   </SectionLabel>
-                  <CarScenario title={carScenario.title} subtitle={carScenario.subtitle} variants={carScenario.carVariants} />
+                  <CarScenario variants={carScenario.carVariants} />
                   <p className="text-xs mt-4" style={{ color: "hsl(220,8%,60%)" }}>
                     Road distance: {data.roadDistanceKm} km ·{" "}
                     {data.routingProvider === "google" ? "Google Maps" :

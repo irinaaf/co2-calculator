@@ -1,35 +1,34 @@
 /**
- * lib/routing.ts — абстракция для расчёта дорожного расстояния.
+ * Road distance abstraction.
  *
- * Сейчас использует OSRM (бесплатный, без ключа).
- * Чтобы переключиться на Google Maps Distance Matrix API:
+ * Defaults to the public OSRM demo server (no key required).
+ * To switch to Google Maps Distance Matrix API:
  *
- *   1. Установи переменную окружения: ROUTING_PROVIDER=google
- *   2. Добавь ключ: GOOGLE_MAPS_API_KEY=your_key
- *   3. Всё остальное — без изменений.
+ *   1. Set env: ROUTING_PROVIDER=google
+ *   2. Set env: GOOGLE_MAPS_API_KEY=your_key
+ *   3. No other changes needed.
  *
- * Поддерживаемые провайдеры:
- *   - "osrm"   — публичный OSRM (router.project-osrm.org), без ключа
- *   - "google" — Google Maps Distance Matrix API, требует GOOGLE_MAPS_API_KEY
+ * Supported providers:
+ *   - "osrm"   — public OSRM demo (router.project-osrm.org), no key
+ *   - "google" — Google Maps Distance Matrix API, requires GOOGLE_MAPS_API_KEY
+ *
+ * Note: the public OSRM demo server prohibits high-volume usage.
+ * Self-host OSRM (https://github.com/Project-OSRM/osrm-backend) for production.
  */
 
 export interface RouteInfo {
-  /** Дорожное расстояние в км */
   distanceKm: number;
-  /** Примерное время в пути на авто в минутах */
   durationMinutes: number;
-  /** Провайдер, который посчитал маршрут */
   provider: "osrm" | "google" | "fallback";
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Единственная публичная функция
+// Public API
 // ─────────────────────────────────────────────────────────────────
 
 /**
- * Получить дорожное расстояние между двумя точками.
- * Автоматически выбирает провайдера по ROUTING_PROVIDER env.
- * При ошибке любого провайдера падает на haversine × 1.25 (fallback).
+ * Get road distance between two coordinates.
+ * Selects provider from ROUTING_PROVIDER env; falls back to haversine × 1.25 on error.
  */
 export async function getRoadDistance(
   fromLat: number,

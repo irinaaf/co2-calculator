@@ -217,13 +217,10 @@ function co2ForLeg(leg: JourneyLeg): number {
   }
 }
 
-/** Detect hurtigbåt from subMode */
+/** Detect hurtigbåt from subMode (high-speed passenger vessel) */
 function isHurtigbat(leg: JourneyLeg): boolean {
   const sub = (leg.subMode ?? "").toLowerCase();
-  return (
-    sub.includes("highspeed") ||
-    sub.includes("local") === false && leg.mode === "water" && (leg.avgSpeedKmh ?? 0) > 25
-  );
+  return sub.includes("highspeed") || sub.includes("highspeedpassenger");
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -233,7 +230,8 @@ function isHurtigbat(leg: JourneyLeg): boolean {
 export interface LegResult {
   fromName: string;
   toName: string;
-  mode: EnturMode;
+  /** EnturMode for real transit legs; "car_ev" for the synthetic car leg in combined scenarios */
+  mode: EnturMode | "car_ev";
   /** e.g. "🚌 Ruta 315 · AtB" */
   modeLabel: string;
   emoji: string;
@@ -249,6 +247,7 @@ export interface LegResult {
 
 export interface JourneyResult {
   durationMinutes: number;
+  durationSeconds: number;
   totalCo2Kg: number;
   /** Annual round-trip CO₂ */
   annualCo2Kg: number;

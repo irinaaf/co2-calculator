@@ -9,6 +9,23 @@ import {
 } from "@/lib/emissions";
 
 // ─────────────────────────────────────────────────────────────────
+// Rate limiting (in-memory per IP, 20 req/min)
+// ─────────────────────────────────────────────────────────────────
+
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+
+function isRateLimited(ip: string, maxPerMinute = 20): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  if (!entry || entry.resetAt < now) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + 60_000 });
+    return false;
+  }
+  entry.count++;
+  return entry.count > maxPerMinute;
+}
+
+// ─────────────────────────────────────────────────────────────────
 // Request / Response types
 // ─────────────────────────────────────────────────────────────────
 
@@ -152,7 +169,7 @@ function buildCombinedJourney(
   const carLeg = {
     fromName: "Origin (car)",
     toName: transitJourney.legs[0]?.fromName ?? "Station",
-    mode: "car_ev" as any,
+    mode: "car_ev" as const,
     modeLabel: `⚡ Car (EV) · ~${carLegKm} km`,
     emoji: "⚡",
     distanceKm: carLegKm,
@@ -195,22 +212,28 @@ function detectUnavailable(journeys: import("@/lib/emissions").JourneyResult[]):
 }
 
 
+type ApiResult = CalculateResponse | { error: string };
+
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse<CalculateResponse>
+  res: NextApiResponse<ApiResult>
 ) {
   if (req.method !== "POST") {
-    return res
-      .status(405)
-      .json({ error: "Method not allowed" } as unknown as CalculateResponse);
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  const ip =
+    (req.headers?.["x-forwarded-for"] as string | undefined)?.split(",")[0].trim() ??
+    req.socket?.remoteAddress ??
+    "unknown";
+  if (process.env.NODE_ENV !== "test" && isRateLimited(ip)) {
+    return res.status(429).json({ error: "Too many requests — try again in a minute" });
   }
 
   const { from, to, dateTime, workDays } = req.body as CalculateRequest;
 
   if (!from || !to) {
-    return res
-      .status(400)
-      .json({ error: "from and to are required" } as unknown as CalculateResponse);
+    return res.status(400).json({ error: "from and to are required" });
   }
 
   const days = Math.min(Math.max(Number(workDays) || 220, 1), 365);
@@ -276,18 +299,21 @@ export default async function handler(
     // Entur returns these placeholders for coordinate-based (non-stop) queries.
     const fromLabel = fromPoint.displayName.split(",")[0].trim();
     const toLabel   = toPoint.displayName.split(",")[0].trim();
-    transitJourneys.forEach((journey) => {
-      journey.legs.forEach((leg, idx) => {
-        if (leg.fromName === "Origin" || leg.fromName === "origin")
-          leg.fromName = fromLabel;
-        if (leg.toName === "Origin" || leg.toName === "origin")
-          leg.toName = fromLabel;
-        if (leg.fromName === "Destination" || leg.fromName === "destination")
-          leg.fromName = toLabel;
-        if (leg.toName === "Destination" || leg.toName === "destination")
-          leg.toName = toLabel;
-      });
-    });
+
+    function replacePlaceholder(name: string): string {
+      if (name === "Origin" || name === "origin") return fromLabel;
+      if (name === "Destination" || name === "destination") return toLabel;
+      return name;
+    }
+
+    const processedJourneys = transitJourneys.map((journey) => ({
+      ...journey,
+      legs: journey.legs.map((leg) => ({
+        ...leg,
+        fromName: replacePlaceholder(leg.fromName),
+        toName:   replacePlaceholder(leg.toName),
+      })),
+    }));
 
     const bikeResult = await bicyclePromise;
 
@@ -296,9 +322,9 @@ export default async function handler(
     const scenarios: Scenario[] = [];
 
     // SCENARIO 1: Public transport — show all Entur options
-    if (transitJourneys.length > 0) {
+    if (processedJourneys.length > 0) {
       // Best transit journey = first (lowest CO₂)
-      const best = transitJourneys[0];
+      const best = processedJourneys[0];
       scenarios.push({
         type: "transit",
         title: "Public transport only",
@@ -306,7 +332,7 @@ export default async function handler(
           ` · ${best.durationMinutes} min`,
         journey: best,
       });
-      transitJourneys.slice(1).forEach((j, i) => {
+      processedJourneys.slice(1).forEach((j, i) => {
         scenarios.push({
           type: "transit",
           title: `Public transport — option ${i + 2}`,
@@ -336,13 +362,12 @@ export default async function handler(
     });
 
     // SCENARIO 3: Combined (P+R / car + transit)
-    if (transitJourneys.length > 0) {
-      const combined = buildCombinedJourney(transitJourneys[0], roadDistanceKm, days);
+    if (processedJourneys.length > 0) {
+      const combined = buildCombinedJourney(processedJourneys[0], roadDistanceKm, days);
       scenarios.push({
         type: "combined",
         title: "Car + Public transport (P+R)",
-        subtitle: `Drive to station · then ${transitJourneys[0].legs.map((l) => l.emoji).join(" + ")}`,
-        subtitle: `Drive to station · then ${transitJourneys[0].legs.filter((l) => l.mode !== "foot").map((l) => l.mode).join(" + ")}`,
+        subtitle: `Drive to station · then ${processedJourneys[0].legs.filter((l) => l.mode !== "foot").map((l) => l.mode).join(" + ")}`,
         journey: combined,
       });
     }
@@ -403,16 +428,14 @@ export default async function handler(
       roadDistanceKm,
       routingProvider: roadInfo.provider,
       scenarios,
-      unavailableModes: transitJourneys.length > 0
-        ? detectUnavailable(transitJourneys)
+      unavailableModes: processedJourneys.length > 0
+        ? detectUnavailable(processedJourneys)
         : ["train", "flight"],
       ferryCrossings,
     });
 
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
-    return res
-      .status(500)
-      .json({ error: message } as unknown as CalculateResponse);
+    return res.status(500).json({ error: message });
   }
 }

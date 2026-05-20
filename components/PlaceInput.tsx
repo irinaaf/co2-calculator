@@ -42,6 +42,7 @@ export function PlaceInput({ label, value, onChange, placeholder = "Place or add
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     function handler(e: MouseEvent) {
@@ -54,16 +55,21 @@ export function PlaceInput({ label, value, onChange, placeholder = "Place or add
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const fetchSuggestions = useCallback(
     debounce(async (query: string) => {
+      abortRef.current?.abort();
+      abortRef.current = new AbortController();
       if (query.trim().length < 2) { setSuggestions([]); setOpen(false); return; }
       setLoading(true);
       try {
-        const res = await fetch(`/api/geocode?q=${encodeURIComponent(query)}`);
+        const res = await fetch(`/api/geocode?q=${encodeURIComponent(query)}`, {
+          signal: abortRef.current.signal,
+        });
         if (!res.ok) throw new Error("geocode failed");
         const data: PlaceSuggestion[] = await res.json();
         setSuggestions(data);
         setOpen(data.length > 0);
-      } catch { setSuggestions([]); }
-      finally { setLoading(false); }
+      } catch (err) {
+        if ((err as Error).name !== "AbortError") setSuggestions([]);
+      } finally { setLoading(false); }
     }, 280), []
   );
 
@@ -115,8 +121,8 @@ export function PlaceInput({ label, value, onChange, placeholder = "Place or add
             border: "1px solid hsl(220,8%,88%)",
             boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
           }}>
-          {suggestions.map((s, i) => (
-            <button key={i} type="button" onMouseDown={() => handleSelect(s)}
+          {suggestions.map((s) => (
+            <button key={`${s.lat},${s.lon}`} type="button" onMouseDown={() => handleSelect(s)}
               className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left text-sm transition-colors"
               style={{ color: "hsl(220,14%,20%)" }}
               onMouseEnter={(e) => (e.currentTarget.style.background = "hsl(220,8%,97%)")}

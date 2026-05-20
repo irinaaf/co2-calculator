@@ -41,8 +41,13 @@ export default async function handler(
       return res.status(upstream.status).json({ error: "Geocoder upstream error" });
     }
 
+    interface RawGeoFeature {
+      properties: { label: string; layer: string };
+      geometry: { coordinates: [number, number] };
+    }
+
     const json = await upstream.json();
-    const features: any[] = json.features ?? [];
+    const features: RawGeoFeature[] = json.features ?? [];
 
     const suggestions: PlaceSuggestion[] = features.map((f) => ({
       label: f.properties.label,

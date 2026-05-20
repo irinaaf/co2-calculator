@@ -62,6 +62,35 @@ export interface JourneyOption {
   legs: JourneyLeg[];
 }
 
+/** Raw GeoJSON feature returned by Entur geocoder */
+interface RawGeoFeature {
+  properties: { label: string; layer: string };
+  geometry: { coordinates: [number, number] };
+}
+
+/** Raw leg object inside a TripPattern from Entur Journey Planner */
+interface RawLeg {
+  mode: string;
+  distance: number | null;
+  duration: number | null;
+  fromPlace: { name: string } | null;
+  toPlace: { name: string } | null;
+  operator: { name: string } | null;
+  line: { publicCode: string } | null;
+  transportSubmode: string | null;
+}
+
+/** Raw TripPattern object from Entur Journey Planner */
+interface RawTripPattern {
+  duration: number;
+  legs: RawLeg[];
+}
+
+/** Raw GraphQL error object */
+interface RawGraphQLError {
+  message: string;
+}
+
 /** Result from the geocoder */
 export interface GeoFeature {
   label: string;    // display name
@@ -102,7 +131,7 @@ export async function geocodeAutocomplete(
 
   const json = await res.json();
 
-  return (json.features ?? []).map((f: any) => ({
+  return (json.features ?? [] as RawGeoFeature[]).map((f: RawGeoFeature) => ({
     label: f.properties.label,
     lat: f.geometry.coordinates[1],
     lon: f.geometry.coordinates[0],
@@ -199,16 +228,16 @@ export async function fetchJourneyOptions(
 
   if (json.errors?.length) {
     throw new Error(
-      `Entur GraphQL error: ${json.errors.map((e: any) => e.message).join("; ")}`
+      `Entur GraphQL error: ${(json.errors as RawGraphQLError[]).map((e) => e.message).join("; ")}`
     );
   }
 
-  const patterns: any[] =
+  const patterns: RawTripPattern[] =
     json.data?.trip?.tripPatterns ?? [];
 
-  return patterns.map((pattern: any): JourneyOption => ({
+  return patterns.map((pattern): JourneyOption => ({
     durationSeconds: pattern.duration,
-    legs: pattern.legs.map((leg: any): JourneyLeg => ({
+    legs: pattern.legs.map((leg): JourneyLeg => ({
       mode: normaliseMode(leg.mode, leg.transportSubmode),
       distanceMetres: leg.distance ?? 0,
       durationSeconds: leg.duration ?? 0,

@@ -3,8 +3,6 @@ import type { CarVariant } from "@/pages/api/calculate";
 import { formatCo2, formatDuration } from "@/lib/emissions";
 
 interface Props {
-  title: string;
-  subtitle: string;
   variants: CarVariant[];
 }
 
