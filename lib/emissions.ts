@@ -305,6 +305,7 @@ export function calcJourneyResult(
         emoji:        modeEmoji(leg.mode),
         distanceKm:   parseFloat(distanceKm.toFixed(2)),
         durationMinutes: Math.round(leg.durationSeconds / 60),
+        durationSeconds: leg.durationSeconds,
         co2Kg,
         co2PerKm,
         operatorName: leg.operatorName,
