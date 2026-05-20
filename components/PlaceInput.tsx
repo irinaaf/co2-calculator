@@ -95,7 +95,6 @@ export function PlaceInput({ label, value, onChange, placeholder = "Place or add
           type="text"
           value={value}
           onChange={handleChange}
-          onFocus={() => suggestions.length > 0 && setOpen(true)}
           placeholder={placeholder}
           required={required}
           autoComplete="off"
