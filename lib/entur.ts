@@ -238,7 +238,7 @@ export async function fetchJourneyOptions(
   return patterns.map((pattern): JourneyOption => ({
     durationSeconds: pattern.duration,
     legs: pattern.legs.map((leg): JourneyLeg => ({
-      mode: normaliseMode(leg.mode, leg.transportSubmode),
+      mode: normaliseMode(leg.mode, leg.transportSubmode ?? undefined),
       distanceMetres: leg.distance ?? 0,
       durationSeconds: leg.duration ?? 0,
       fromName: leg.fromPlace?.name ?? "",
