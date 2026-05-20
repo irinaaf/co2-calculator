@@ -1,0 +1,106 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Scandinavian design tokens ──────────────────────────────── */
+@layer base {
+  :root {
+    /* Backgrounds */
+    --background:        34 20% 96%;   /* warm off-white #F5F4F2 */
+    --card:              0  0% 100%;   /* pure white cards */
+    --card-foreground:   220 14% 12%;
+
+    /* Typography */
+    --foreground:        220 14% 12%;  /* deep charcoal #1A1D23 */
+    --muted-foreground:  220  8% 48%;  /* mid gray #737885 */
+
+    /* Borders */
+    --border:            220  8% 90%;  /* very soft border #E2E4E9 */
+    --input:             220  8% 90%;
+
+    /* Accent — muted forest green (Scandinavian) */
+    --ring:              150 30% 35%;  /* #3D7A5A */
+    --accent:            150 30% 35%;  /* same */
+    --accent-light:      150 24% 94%; /* very light green tint #EEF5F1 */
+
+    /* Muted surfaces */
+    --muted:             220  8% 95%;  /* #EEEEF1 */
+
+    /* Status */
+    --destructive:       0   72% 55%;
+    --destructive-foreground: 0 0% 98%;
+  }
+}
+
+@layer base {
+  * { border-color: hsl(var(--border)); }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI',
+                 system-ui, sans-serif;
+    font-feature-settings: "rlig" 1, "calt" 1, "kern" 1;
+    letter-spacing: -0.01em;
+    line-height: 1.5;
+  }
+}
+
+/* ── Typography helpers ──────────────────────────────────────── */
+@layer utilities {
+  .label-xs {
+    font-size: 0.6875rem;   /* 11px */
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: hsl(var(--muted-foreground));
+  }
+
+  /* Thin horizontal rule between sections */
+  .section-rule {
+    border: none;
+    border-top: 1px solid hsl(var(--border));
+    margin: 1.5rem 0;
+  }
+}
+
+/* ── SVG icon helpers ────────────────────────────────────────── */
+@layer utilities {
+  .icon-muted   { color: hsl(var(--muted-foreground)); }
+  .icon-accent  { color: hsl(var(--accent)); }
+}
+
+/* ── Slider — Scandinavian green thumb ──────────────────────── */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 2px;
+  background: hsl(var(--border));
+  border-radius: 9999px;
+  outline: none;
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: hsl(var(--accent));
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+  cursor: pointer;
+}
+input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: hsl(var(--accent));
+  border: 2px solid #fff;
+  cursor: pointer;
+}
