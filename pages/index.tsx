@@ -8,7 +8,7 @@ import { LegBreakdown } from "@/components/LegBreakdown";
 import { CarScenario } from "@/components/CarScenario";
 import { BicycleScenario } from "@/components/BicycleScenario";
 import { FerryCrossingsInfo } from "@/components/FerryCrossingsInfo";
-import { exportCsv, exportCsrdText } from "@/lib/export";
+import { exportCsv, exportCsrdText, type SelectedJourney } from "@/lib/export";
 import { formatCo2, formatDuration } from "@/lib/emissions";
 
 const EXAMPLE_ROUTES = [
@@ -70,19 +70,20 @@ export default function Home() {
 
     setWarning(null);
 
-    if (dateTime) {
-      const dep = new Date(dateTime);
-      if (!isNaN(dep.getTime()) && dep.getTime() < Date.now() - 60_000) {
-        setWarning("Departure time is in the past. Showing schedules based on a typical future departure — results are valid for CSRD reporting.");
-      }
+    const isPast = !!(dateTime &&
+      !isNaN(new Date(dateTime).getTime()) &&
+      new Date(dateTime).getTime() < Date.now() - 60_000);
+    if (isPast) {
+      setWarning("Departure time is in the past. Schedules shown are based on current departures — valid for CSRD reporting purposes.");
     }
+    const effectiveDateTime = isPast ? defaultDateTime() : dateTime;
 
     setLoading(true); setError(null); setData(null); setCsrdText(null);
     try {
       const res = await fetch("/api/calculate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ from, to, workDays, dateTime }),
+        body: JSON.stringify({ from, to, workDays, dateTime: effectiveDateTime }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Calculation failed");
@@ -92,14 +93,34 @@ export default function Home() {
     } finally { setLoading(false); }
   }
 
+  function buildSelectedJourney(): SelectedJourney | null {
+    if (bestMode === "transit") return bestTransitOnly;
+    if (carIsOverallBest && bestCarVariant) {
+      return {
+        totalCo2Kg: overallWinnerCo2,
+        annualCo2Kg: parseFloat((overallWinnerCo2 * 2 * workDays).toFixed(1)),
+        durationMinutes: 0,
+        durationSeconds: 0,
+        legs: [],
+        label: bestCarVariant.label,
+      };
+    }
+    return bestJourney;
+  }
+
   function handleExportCsv() {
     if (!data) return;
-    exportCsv(data.scenarios.flatMap((s) => s.journey ? [s.journey] : []),
+    const journeys = data.scenarios.flatMap((s) => s.journey ? [s.journey] : []);
+    exportCsv(journeys, buildSelectedJourney(),
       data.from.displayName, data.to.displayName, data.distanceKm, workDays);
   }
   function handleCsrd() {
     if (!data) return;
-    const text = exportCsrdText(data.scenarios.flatMap((s) => s.journey ? [s.journey] : []),
+    const journeys = data.scenarios.flatMap((s) => s.journey ? [s.journey] : []);
+    const reportingBasis = bestMode === "co2"
+      ? "Global CO₂ minimum (all transport modes)"
+      : "Best public transport route";
+    const text = exportCsrdText(journeys, buildSelectedJourney(), reportingBasis,
       data.from.displayName, data.to.displayName, data.distanceKm, workDays);
     setCsrdText(text);
   }
