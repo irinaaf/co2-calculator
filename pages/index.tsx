@@ -76,7 +76,32 @@ export default function Home() {
     if (isPast) {
       setWarning("Departure time is in the past. Schedules shown are based on current departures — valid for CSRD reporting purposes.");
     }
-    const effectiveDateTime = isPast ? defaultDateTime() : dateTime;
+
+    // For past dates: keep the same TIME and DAY OF WEEK, but move to the
+    // nearest future occurrence of that weekday (today or next week).
+    // Example: user entered "Monday 08:00" last week → send next Monday 08:00.
+    function nextMatchingWeekday(dt: string): string {
+      // Parse explicitly to avoid browser DST-at-midnight edge cases
+      const [datePart, timePart] = dt.split("T");
+      const [targetHH, targetMM] = timePart.split(":").map(Number);
+      // Use noon to determine day-of-week — avoids DST transitions at midnight
+      const targetDow = new Date(datePart + "T12:00:00").getDay();
+
+      const now = new Date();
+      const candidate = new Date(now);
+      candidate.setHours(targetHH, targetMM, 0, 0);
+
+      let daysAhead = (targetDow - now.getDay() + 7) % 7;
+      if (daysAhead === 0 && candidate.getTime() <= Date.now()) daysAhead = 7;
+      candidate.setDate(candidate.getDate() + daysAhead);
+
+      // Return as local datetime string — the API interprets this as Europe/Oslo local time.
+      // toISOString() returns UTC which would cause a ±1-2h error depending on season.
+      const pad = (n: number) => String(n).padStart(2, "0");
+      return `${candidate.getFullYear()}-${pad(candidate.getMonth() + 1)}-${pad(candidate.getDate())}T${pad(candidate.getHours())}:${pad(candidate.getMinutes())}`;
+    }
+
+    const effectiveDateTime = isPast ? nextMatchingWeekday(dateTime) : dateTime;
 
     setLoading(true); setError(null); setData(null); setCsrdText(null);
     try {
