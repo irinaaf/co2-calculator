@@ -58,19 +58,22 @@ export default function Home() {
   const [dateTime, setDateTime] = useState(defaultDateTime);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const [data, setData] = useState<CalculateResponse | null>(null);
   const [csrdText, setCsrdText] = useState<string | null>(null);
   const [showAbout, setShowAbout] = useState(false);
+  const [bestMode, setBestMode] = useState<"co2" | "transit">("co2");
 
   async function calculate(e: React.FormEvent) {
     e.preventDefault();
     if (!from.trim() || !to.trim()) return;
 
+    setWarning(null);
+
     if (dateTime) {
       const dep = new Date(dateTime);
       if (!isNaN(dep.getTime()) && dep.getTime() < Date.now() - 60_000) {
-        setError("Departure time is in the past. Please select a future time for accurate schedules.");
-        return;
+        setWarning("Departure time is in the past. Showing schedules based on a typical future departure — results are valid for CSRD reporting.");
       }
     }
 
@@ -109,6 +112,10 @@ export default function Home() {
   const groundTransitScenarios = transitScenarios.filter(
     (s) => !s.journey?.legs.some((l) => l.mode === "air")
   );
+  const bestTransitOnly: JourneyResult | null =
+    groundTransitScenarios.flatMap((s) => s.journey ? [s.journey] : [])
+      .sort((a, b) => a.totalCo2Kg - b.totalCo2Kg)[0] ?? null;
+
   const airTransitScenarios = transitScenarios.filter(
     (s) => s.journey?.legs.some((l) => l.mode === "air")
   );
@@ -165,6 +172,12 @@ export default function Home() {
     ? { icon: <Leaf size={11} strokeWidth={1.8} />, label: "Bus is lowest CO₂", bg: "hsl(220,8%,92%)", color: "hsl(220,12%,40%)" }
     : { icon: <Leaf size={11} strokeWidth={1.8} />, label: "Public transport is lowest CO₂", bg: "hsl(150,24%,86%)", color: "hsl(150,30%,30%)" },
   [carIsOverallBest, bestCarVariant, bestIsAir, bestIsCombined, bestTransitMode]);
+
+  const effectiveIsCarBest = bestMode === "co2" && carIsOverallBest;
+  const effectiveJourney   = bestMode === "transit" ? bestTransitOnly : bestJourney;
+  const effectiveCo2       = bestMode === "transit"
+    ? (bestTransitOnly?.totalCo2Kg ?? 0)
+    : overallWinnerCo2;
 
   return (
     <>
@@ -278,6 +291,17 @@ export default function Home() {
             </div>
           )}
 
+          {/* ── WARNING (past time, non-blocking) ─────────────── */}
+          {warning && (
+            <div className="rounded-xl px-4 py-3 text-sm flex items-start gap-2.5"
+              style={{ background: "hsl(220,8%,96%)", border: "1px solid hsl(220,8%,88%)", color: "hsl(220,12%,40%)" }}>
+              <span className="flex-shrink-0 mt-0.5" style={{ color: "hsl(220,8%,58%)" }}>
+                <Clock size={14} strokeWidth={1.8} />
+              </span>
+              <span>{warning}</span>
+            </div>
+          )}
+
           {/* ── RESULTS ───────────────────────────────────────── */}
           {data && (
             <div className="space-y-3">
@@ -286,7 +310,7 @@ export default function Home() {
               {(bestJourney || carIsOverallBest) && (
                 <div className="rounded-2xl p-6"
                   style={{ background: "hsl(150,20%,94%)", border: "1px solid hsl(150,20%,84%)" }}>
-                  <div className="flex items-center gap-2.5 mb-5">
+                  <div className="flex items-center gap-2.5 mb-3">
                     <div className="w-1 h-5 rounded-full flex-shrink-0" style={{ background: "hsl(150,30%,38%)" }} />
                     <span className="text-base font-semibold" style={{ color: "hsl(220,14%,12%)" }}>Best route</span>
                     <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full"
@@ -296,6 +320,25 @@ export default function Home() {
                     </span>
                   </div>
 
+                  <div className="flex items-center gap-2 mb-5">
+                    <span className="text-xs" style={{ color: "hsl(220,8%,52%)" }}>Best by:</span>
+                    {(["co2", "transit"] as const).map((mode) => (
+                      <button key={mode} type="button" onClick={() => setBestMode(mode)}
+                        className="text-xs px-2.5 py-1 rounded-full transition-colors"
+                        style={bestMode === mode
+                          ? { background: "hsl(150,24%,86%)", color: "hsl(150,30%,30%)", border: "1px solid hsl(150,24%,76%)" }
+                          : { background: "#fff", color: "hsl(220,8%,52%)", border: "1px solid hsl(220,8%,86%)" }
+                        }>
+                        {mode === "co2" ? "🌿 Lowest CO₂" : "🚌 Public transport only"}
+                      </button>
+                    ))}
+                  </div>
+
+                  {bestMode === "transit" && !bestTransitOnly ? (
+                    <p className="text-sm pb-5" style={{ color: "hsl(220,8%,55%)" }}>
+                      No public transport routes found for this route.
+                    </p>
+                  ) : (
                   <div className="grid grid-cols-3 gap-4 mb-5">
                     <div>
                       <p className="label-xs mb-1.5">Route</p>
@@ -304,8 +347,8 @@ export default function Home() {
                       </p>
                     </div>
                     <div>
-                      <p className="label-xs mb-1.5">{carIsOverallBest ? "Mode" : "Duration"}</p>
-                      {carIsOverallBest ? (
+                      <p className="label-xs mb-1.5">{effectiveIsCarBest ? "Mode" : "Duration"}</p>
+                      {effectiveIsCarBest ? (
                         <p className="text-sm font-semibold" style={{ color: "hsl(220,14%,15%)" }}>
                           {bestCarVariant?.label}
                         </p>
@@ -313,7 +356,7 @@ export default function Home() {
                         <div className="flex items-center gap-1.5">
                           <span style={{ color: "hsl(220,8%,50%)" }}>{Ic.clock(14)}</span>
                           <p className="text-sm font-semibold" style={{ color: "hsl(220,14%,15%)" }}>
-                            {formatDuration(bestJourney!.durationMinutes)}
+                            {formatDuration(effectiveJourney!.durationMinutes)}
                           </p>
                         </div>
                       )}
@@ -323,15 +366,16 @@ export default function Home() {
                       <div className="flex items-center gap-1.5">
                         <span style={{ color: "hsl(150,30%,40%)" }}><Leaf size={14} strokeWidth={1.8} /></span>
                         <p className="text-sm font-semibold" style={{ color: "hsl(150,30%,32%)" }}>
-                          {formatCo2(overallWinnerCo2)}
+                          {formatCo2(effectiveCo2)}
                         </p>
                       </div>
                     </div>
                   </div>
+                  )}
 
                   <div className="pt-4 border-t flex justify-between items-center"
                     style={{ borderColor: "hsl(150,18%,80%)" }}>
-                    {carIsOverallBest ? (
+                    {effectiveIsCarBest ? (
                       <>
                         <span className="text-xs" style={{ color: "hsl(220,8%,52%)" }}>vs. best public transport</span>
                         {bestJourney && (
@@ -350,9 +394,9 @@ export default function Home() {
                           <span className="text-xs" style={{ color: "hsl(220,14%,30%)" }}>
                             {formatCo2(bestCarCo2 as number)} CO₂{" "}
                             <span style={{ color: "hsl(220,8%,52%)" }}>
-                              ({(bestCarCo2 as number) > overallWinnerCo2
-                                ? `+${formatCo2((bestCarCo2 as number) - overallWinnerCo2)}`
-                                : `−${formatCo2(overallWinnerCo2 - (bestCarCo2 as number))}`})
+                              ({(bestCarCo2 as number) > effectiveCo2
+                                ? `+${formatCo2((bestCarCo2 as number) - effectiveCo2)}`
+                                : `−${formatCo2(effectiveCo2 - (bestCarCo2 as number))}`})
                             </span>
                           </span>
                         )}
