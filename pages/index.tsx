@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import Head from "next/head";
-import { Car, Plane, Leaf, Clock, TrainFront, Ship, Bus, Shuffle, Info, X } from "lucide-react";
+import { Car, Leaf, Clock, TrainFront, Info, X } from "lucide-react";
 import type { CalculateResponse } from "./api/calculate";
 import type { JourneyResult } from "@/lib/emissions";
 import { PlaceInput } from "@/components/PlaceInput";
@@ -154,16 +154,16 @@ export default function Home() {
   const bestTransitMode = useMemo(() => dominantMode(bestJourney), [bestJourney]);
 
   const winnerBadge = useMemo(() => carIsOverallBest
-    ? { icon: <Car size={11} strokeWidth={1.8} />, label: `${bestCarVariant?.label} is lowest CO₂`, bg: "hsl(150,24%,86%)", color: "hsl(150,30%,30%)" }
+    ? { icon: <Leaf size={11} strokeWidth={1.8} />, label: `${bestCarVariant?.label} is lowest CO₂`, bg: "hsl(150,24%,86%)", color: "hsl(150,30%,30%)" }
     : bestIsAir
-    ? { icon: <Plane size={11} strokeWidth={1.8} />, label: "via flight", bg: "hsl(40,80%,92%)", color: "hsl(40,60%,35%)" }
+    ? { icon: <Leaf size={11} strokeWidth={1.8} />, label: "via flight", bg: "hsl(40,80%,92%)", color: "hsl(40,60%,35%)" }
     : bestIsCombined
-    ? { icon: <Shuffle size={11} strokeWidth={1.8}/>, label: "Car + public transport", bg: "hsl(220,8%,92%)", color: "hsl(220,12%,40%)" }
+    ? { icon: <Leaf size={11} strokeWidth={1.8} />, label: "Car + public transport", bg: "hsl(220,8%,92%)", color: "hsl(220,12%,40%)" }
     : bestTransitMode === "ferry"
-    ? { icon: <Ship size={11} strokeWidth={1.8} />, label: "Ferry route", bg: "hsl(210,30%,92%)", color: "hsl(210,35%,35%)" }
+    ? { icon: <Leaf size={11} strokeWidth={1.8} />, label: "Ferry route", bg: "hsl(210,30%,92%)", color: "hsl(210,35%,35%)" }
     : bestTransitMode === "bus"
-    ? { icon: <Bus size={11} strokeWidth={1.8} />, label: "Bus is lowest CO₂", bg: "hsl(220,8%,92%)", color: "hsl(220,12%,40%)" }
-    : { icon: <TrainFront size={11} strokeWidth={1.8}/>, label: "Public transport is lowest CO₂", bg: "hsl(150,24%,86%)", color: "hsl(150,30%,30%)" },
+    ? { icon: <Leaf size={11} strokeWidth={1.8} />, label: "Bus is lowest CO₂", bg: "hsl(220,8%,92%)", color: "hsl(220,12%,40%)" }
+    : { icon: <Leaf size={11} strokeWidth={1.8} />, label: "Public transport is lowest CO₂", bg: "hsl(150,24%,86%)", color: "hsl(150,30%,30%)" },
   [carIsOverallBest, bestCarVariant, bestIsAir, bestIsCombined, bestTransitMode]);
 
   return (
@@ -362,6 +362,14 @@ export default function Home() {
                 </div>
               )}
 
+              {/* ── FERRY CROSSINGS (once, after Best route) ──────── */}
+              {(data.ferryCrossings?.length ?? 0) > 0 && (
+                <div className="rounded-2xl p-6"
+                  style={{ background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.06), 0 0 0 1px hsl(220,8%,90%)" }}>
+                  <FerryCrossingsInfo crossings={data.ferryCrossings} mode="car" />
+                </div>
+              )}
+
               {/* ── SECTION 1: Public transport ─────────────────── */}
               <div className="rounded-2xl p-6"
                 style={{ background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.06), 0 0 0 1px hsl(220,8%,90%)" }}>
@@ -416,10 +424,6 @@ export default function Home() {
                     {data.routingProvider === "google" ? "Google Maps" :
                      data.routingProvider === "osrm" ? "OSRM / OpenStreetMap" : "estimated"}
                   </p>
-                  {/* Ferry info for car — shows CO₂ per car as reference */}
-                  {(data.ferryCrossings?.length ?? 0) > 0 && (
-                    <FerryCrossingsInfo crossings={data.ferryCrossings} mode="car" />
-                  )}
                 </div>
               )}
 
@@ -429,9 +433,6 @@ export default function Home() {
                   style={{ background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.06), 0 0 0 1px hsl(220,8%,90%)" }}>
                   <SectionLabel>Car + public transport (Park &amp; Ride)</SectionLabel>
                   <LegBreakdown journey={combinedScenario.journey} index={0} isBest={false} badge="P+R" />
-                  {(data.ferryCrossings?.length ?? 0) > 0 && (
-                    <FerryCrossingsInfo crossings={data.ferryCrossings} mode="transit" />
-                  )}
                 </div>
               )}
 
@@ -443,9 +444,6 @@ export default function Home() {
                   style={{ background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.06), 0 0 0 1px hsl(220,8%,90%)" }}>
                   <SectionLabel>Bicycle</SectionLabel>
                   <BicycleScenario data={bicycleScenario.bicycleRoute} />
-                  {(data.ferryCrossings?.length ?? 0) > 0 && (
-                    <FerryCrossingsInfo crossings={data.ferryCrossings} mode="transit" />
-                  )}
                 </div>
               )}
 
@@ -595,12 +593,12 @@ export default function Home() {
                 <div className="rounded-xl p-4 space-y-2"
                   style={{ background: "hsl(220,8%,97%)", border: "1px solid hsl(220,8%,91%)" }}>
                   {[
-                    ["Emission factors", "Miljødirektoratet klimakalkulator + EEA Transport 2023"],
+                    ["Emission factors", "EEA (estimated specific emissions by mode) · Miljødirektoratet · Entur + SINTEF Energimodul (ISO 14083:2023)"],
                     ["Norwegian rail", "0.009 kg CO₂/pkm — Vy operates on ~99% hydropower"],
-                    ["Buses", "Operator-specific: Ruter 0.011 · AtB 0.018 · regional 0.027 kg/pkm"],
+                    ["Buses", "Operator-specific fleet data: Ruter (Oslo) 0.011 · AtB (Trondheim) 0.018 · regional 0.027 kg/pkm"],
                     ["Ferry", "0.019–0.025 kg/pkm — Norled/Fjord1 fleet data 2023"],
                     ["Flight", "0.255 kg/pkm incl. IPCC radiative forcing ×1.9"],
-                    ["Road distance", "OSRM (OpenStreetMap) — incl. E39 ferry crossings"],
+                    ["Road distance", "OSRM routing engine (OpenStreetMap) — accounts for E39 ferry crossings"],
                     ["Car assumption", "Solo driver (1 person). Public transport factors already include average vehicle occupancy — you pay your share of shared emissions."],
                   ].map(([label, value], idx) => (
                     <div key={idx} className="flex justify-between text-xs gap-4">

@@ -25,7 +25,7 @@ export function FerryCrossingsInfo({ crossings, mode }: Props) {
   if (!crossings.length) return null;
 
   return (
-    <div className="mt-4 pt-3 border-t" style={{ borderColor: "hsl(210,30%,90%)" }}>
+    <div>
       <div className="flex items-center gap-1.5 mb-2">
         <span style={{ color: "hsl(210,35%,45%)" }}>
           <Ship size={13} strokeWidth={1.8} />

@@ -29,7 +29,7 @@ Browser (React)
 ### 1. Address autocomplete
 
 ```
-User types → PlaceInput (280ms debounce)
+User types → PlaceInput (280ms debounce, AbortController cancels stale requests)
     → /api/geocode?q=...
     → Entur Geocoder: ET-Client-Name header, boundary=NO
     → Cache-Control: max-age=300
@@ -74,15 +74,26 @@ Sort by duration → return up to 9 unique patterns
 
 ### 4. "Origin"/"Destination" replacement
 
-Entur returns `fromPlace.name = "Origin"` / `toPlace.name = "Destination"` for coordinate-based queries (non-stop input). After `calcJourneyResult()`:
+Entur returns `fromPlace.name = "Origin"` / `toPlace.name = "Destination"` for coordinate-based queries (non-stop input). After `calcJourneyResult()`, names are replaced with real geocoded labels using an immutable spread:
 
 ```typescript
-transitJourneys.forEach(journey => {
-  journey.legs.forEach(leg => {
-    if (leg.fromName === "Origin") leg.fromName = fromLabel;  // "Seterbrua"
-    if (leg.toName === "Destination") leg.toName = toLabel;   // "Dronningens gate"
-  });
-});
+const fromLabel = fromPoint.displayName.split(",")[0].trim();
+const toLabel   = toPoint.displayName.split(",")[0].trim();
+
+const replacePlaceholder = (name: string): string => {
+  if (name === "Origin" || name === "origin") return fromLabel;
+  if (name === "Destination" || name === "destination") return toLabel;
+  return name;
+};
+
+const processedJourneys = transitJourneys.map(journey => ({
+  ...journey,
+  legs: journey.legs.map(leg => ({
+    ...leg,
+    fromName: replacePlaceholder(leg.fromName),
+    toName:   replacePlaceholder(leg.toName),
+  })),
+}));
 ```
 
 ### 5. CO₂ calculation per leg
@@ -109,26 +120,30 @@ OPERATOR_BUS_CO2 = {
 
 ### 6. Ferry crossing detection (`lib/ferries.ts`)
 
-Static table of 10 major Norwegian ferry crossings with terminal coordinates. Detection algorithm:
+Static table of 10 major Norwegian ferry crossings with terminal coordinates. Detection algorithm — cross-side haversine check:
 
 ```
 routeCrossesFerry(from, to, ferry):
   1. routeLen = haversine(from, to)
      ferryLen = haversine(t1, t2)
      if routeLen < ferryLen × 1.2 → false  // city route filter
-  
-  2. Cross-side check:
-     (dist(from, t1) ≤ 25km AND dist(to, t2) ≤ 25km)
+
+  2. Dynamic radius: maxTerminalKm = max(40, ferryLen × 1.5)
+
+  3. Cross-side check:
+     (dist(from, t1) ≤ maxTerminalKm AND dist(to, t2) ≤ maxTerminalKm)
      OR
-     (dist(from, t2) ≤ 25km AND dist(to, t1) ≤ 25km)
+     (dist(from, t2) ≤ maxTerminalKm AND dist(to, t1) ≤ maxTerminalKm)
 ```
 
-Result: `Dronningens gate → St. Olav` (0.15 km) does NOT trigger Rørvik–Flakk (19.5 km). `Rissa → Trondheim` (27.6 km) does.
+Result: `Dronningens gate → St. Olav` (0.15 km) does NOT trigger Rørvik–Flakk (19.5 km). `Rissa → Trondheim` (27.6 km) does. `Stavanger → Bokn` triggers Mortavika–Arsvågen via 40 km dynamic radius.
 
 **CO₂ per car** (shown informational only, NOT added to total):
 - GHG Protocol assigns vehicle ferry transport to Scope 3 Cat.6
 - OSRM includes ferry distance but applies EV/petrol factor throughout
 - Adding ferry separately would require knowing vehicle deck utilization per crossing
+
+`CalculateResponse` includes `ferryCrossings: FerryCrossing[]` — the detected crossings are passed to the client and displayed once in a dedicated card after the Best route block (mode="car", showing CO₂ per car as a reference value).
 
 ### 7. Scenario building
 
@@ -159,23 +174,16 @@ annualCo2 = overallWinnerCo2 × 2 × workDays;
 
 ### 9. Badge determination
 
-```typescript
-dominantMode(journey): "flight"|"ferry"|"rail"|"bus"|"transit" {
-  modes = journey.legs.filter(l => l.mode !== "foot").map(l => l.mode);
-  "air"   → "flight"
-  "water" + "rail"/"bus" → "mixed" → defaults to "rail" badge
-  "water" → "ferry"
-  "rail"/"tram"/"metro" → "rail"
-  "bus" → "bus"
-}
+All winner badges use the `<Leaf>` icon regardless of transport type. Colors distinguish route category:
 
+```typescript
 winnerBadge:
-  carIsOverallBest  → { icon: Car,        label: "Car (EV) is lowest CO₂" }
-  bestIsAir         → { icon: Plane,      label: "via flight" }
-  bestIsCombined    → { icon: Shuffle,    label: "Car + public transport" }
-  ferry             → { icon: Ship,       label: "Ferry route" }
-  bus               → { icon: Bus,        label: "Bus is lowest CO₂" }
-  default           → { icon: TrainFront, label: "Public transport is lowest CO₂" }
+  carIsOverallBest  → { icon: Leaf, label: "Car (EV) is lowest CO₂",        bg: green  }
+  bestIsAir         → { icon: Leaf, label: "via flight",                     bg: amber  }
+  bestIsCombined    → { icon: Leaf, label: "Car + public transport",          bg: gray   }
+  ferry             → { icon: Leaf, label: "Ferry route",                    bg: blue   }
+  bus               → { icon: Leaf, label: "Bus is lowest CO₂",              bg: gray   }
+  default           → { icon: Leaf, label: "Public transport is lowest CO₂", bg: green  }
 ```
 
 ---
@@ -184,14 +192,24 @@ winnerBadge:
 
 ```
 index.tsx
-├── PlaceInput           — Entur autocomplete (proxied, debounced)
+├── PlaceInput           — Entur autocomplete (proxied, debounced, AbortController)
 ├── LegBreakdown         — transit timeline with lucide mode icons
 │     ├── fmtDeparture() — formats ISO → Oslo timezone display
 │     └── fmtSeconds()   — exact duration from Entur durationSeconds
 ├── CarScenario          — car/bike/walk variants with progress bars
 ├── BicycleScenario      — bicycle route card (suppressed if ≤25km route)
-└── FerryCrossingsInfo   — ferry panel (car: CO₂/car; transit: name only)
+└── FerryCrossingsInfo   — ferry panel shown once after Best route card (mode="car")
 ```
+
+**Page layout order (when results shown):**
+1. Best route card (green, winner summary)
+2. Ferry crossings card — once, mode="car" (CO₂ per car, informational reference)
+3. Section 1: Public transport (ground + air subsections)
+4. Section 2: Private car
+5. Section 3: Car + public transport (P+R)
+6. Section 4: Bicycle (if applicable)
+7. Annual impact
+8. Export buttons
 
 **Icons (lucide-react 0.474.0):**
 
@@ -200,7 +218,44 @@ index.tsx
 | LegBreakdown | TrainFront, TramFront, Bus, Ship, Plane, Car, Bike, PersonStanding, Zap, Shuffle, HelpCircle |
 | CarScenario | Car, Zap, Fuel, Bike, PersonStanding |
 | BicycleScenario | Bike, Leaf, Route |
-| index.tsx | Car, Plane, Leaf, Clock, TrainFront, Ship, Bus, Shuffle, Info, X |
+| FerryCrossingsInfo | Ship |
+| index.tsx | Car, Leaf, Clock, TrainFront, Info, X |
+
+---
+
+## File Reference
+
+| File | Purpose |
+|---|---|
+| `pages/index.tsx` | Main UI — form, results layout, best-route logic |
+| `pages/api/calculate.ts` | API orchestrator — geocoding, routing, CO₂, scenarios |
+| `pages/api/geocode.ts` | Geocoder proxy with Cache-Control header |
+| `lib/entur.ts` | Entur Journey Planner + Geocoder GraphQL client |
+| `lib/emissions.ts` | CO₂ factors, `calcJourneyResult`, `calculateResults` |
+| `lib/ferries.ts` | Static table of 10 Norwegian ferry crossings + detection algorithm |
+| `lib/routing.ts` | OSRM road distance with 8s timeout, haversine×1.25 fallback |
+| `lib/export.ts` | `exportCsv` and `exportCsrdText` (ESRS E1-6 Cat.7) |
+| `components/PlaceInput.tsx` | Autocomplete input with debounce + AbortController |
+| `components/LegBreakdown.tsx` | Per-journey leg timeline |
+| `components/CarScenario.tsx` | Car/bike/walk variant grid |
+| `components/BicycleScenario.tsx` | Bicycle route summary |
+| `components/FerryCrossingsInfo.tsx` | Ferry crossing info panel (car: CO₂ per car; transit: name only) |
+| `METHODOLOGY.md` | User-facing methodology and data source documentation |
+
+---
+
+## Data Sources
+
+| Source | URL | Used for |
+|---|---|---|
+| Entur Journey Planner v3 | https://developer.entur.org/pages-journeyplanner-journeyplanner | Transit routes (GraphQL) |
+| Entur Geocoder | https://developer.entur.org/pages-geocoder-api | Address → coordinates |
+| Miljødirektoratet | https://miljostatus.miljodirektoratet.no/tema/klima/norske-utslipp-av-klimagasser/klimagassutslipp-fra-transport/ | Norwegian transport emission factors |
+| SSB | https://www.ssb.no/natur-og-miljo/forurensning-og-klima/statistikk/utslipp-til-luft | National emission statistics |
+| Entur miljø | https://miljo.entur.org/om-prosjektet | SINTEF Energimodul / ISO 14083:2023 methodology |
+| SINTEF Energimodul | https://energimodul.sintef.no/method | Per-operator CO₂ methodology |
+| EEA | https://www.eea.europa.eu/en/analysis/maps-and-charts/estimated-specific-emissions-of-co2 | Estimated specific CO₂ emissions by mode |
+| OSRM | http://router.project-osrm.org | Road distance routing |
 
 ---
 
