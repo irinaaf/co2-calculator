@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import Head from "next/head";
-import { Car, Leaf, Clock, TrainFront, Info, X } from "lucide-react";
+import { Car, Leaf, Bus, Clock, TrainFront, Info, X } from "lucide-react";
 import type { CalculateResponse } from "./api/calculate";
 import type { JourneyResult } from "@/lib/emissions";
 import { PlaceInput } from "@/components/PlaceInput";
@@ -383,12 +383,14 @@ export default function Home() {
                     <span className="text-xs" style={{ color: "hsl(220,8%,52%)" }}>Best by:</span>
                     {(["co2", "transit"] as const).map((mode) => (
                       <button key={mode} type="button" onClick={() => setBestMode(mode)}
-                        className="text-xs px-2.5 py-1 rounded-full transition-colors"
+                        className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full transition-colors"
                         style={bestMode === mode
                           ? { background: "hsl(150,24%,86%)", color: "hsl(150,30%,30%)", border: "1px solid hsl(150,24%,76%)" }
                           : { background: "#fff", color: "hsl(220,8%,52%)", border: "1px solid hsl(220,8%,86%)" }
                         }>
-                        {mode === "co2" ? "🌿 Lowest CO₂" : "🚌 Public transport only"}
+                        {mode === "co2"
+                          ? <><Leaf size={12} strokeWidth={1.8} />Lowest CO₂</>
+                          : <><Bus  size={12} strokeWidth={1.8} />Public transport only</>}
                       </button>
                     ))}
                   </div>
