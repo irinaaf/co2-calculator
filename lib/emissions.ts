@@ -256,6 +256,16 @@ export interface JourneyResult {
   departureTime?: string;
 }
 
+export interface CarVariant {
+  label: string;
+  emoji: string;
+  co2Kg: number;
+  annualCo2Kg: number;
+  costNok: number;
+  durationMinutes: number;
+  color: string;
+}
+
 /** Map EnturMode to display emoji */
 function modeEmoji(mode: EnturMode): string {
   const map: Partial<Record<EnturMode, string>> = {

@@ -136,8 +136,20 @@ export default function Home() {
   function handleExportCsv() {
     if (!data) return;
     const journeys = data.scenarios.flatMap((s) => s.journey ? [s.journey] : []);
-    exportCsv(journeys, buildSelectedJourney(),
-      data.from.displayName, data.to.displayName, data.distanceKm, workDays);
+    const carVariants = data.scenarios.find((s) => s.type === "car")?.carVariants ?? [];
+    const bestModeLabel = bestMode === "co2" ? "Lowest CO₂" : "Public transport only";
+    exportCsv(
+      journeys,
+      buildSelectedJourney(),
+      carVariants,
+      data.ferryCrossings ?? [],
+      bestModeLabel,
+      data.from.displayName,
+      data.to.displayName,
+      data.distanceKm,
+      data.roadDistanceKm,
+      workDays
+    );
   }
   function handleCsrd() {
     if (!data) return;
@@ -229,6 +241,7 @@ export default function Home() {
     <>
       <Head>
         <title>CO₂ Route Calculator — Norway</title>
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
         <meta name="description" content="Compare CO₂ emissions for train, bus, ferry and car between Norwegian locations. CSRD scope 3 export." />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
@@ -669,6 +682,7 @@ export default function Home() {
                     { icon: <Clock size={14} strokeWidth={1.8}/>, text: "Wide-window search: scans ±4 hours around departure time to find the best available connections" },
                     { icon: <Car size={14} strokeWidth={1.8}/>, text: "Compares ALL transport types in one view — public transport, EV, petrol, diesel, bicycle, walking, P+R" },
                     { icon: <Leaf size={14} strokeWidth={1.8}/>, text: "Best route selected as global CO₂ minimum across all options, not just public transport" },
+                    { icon: <Leaf size={14} strokeWidth={1.8}/>, text: "Toggle: switch Best route between 'Lowest CO₂' and 'Public transport only' — the selected view is exported in the CSRD report" },
                     { icon: <Info size={14} strokeWidth={1.8}/>, text: "CSRD Scope 3 report export — pre-formatted for ESRS E1-6 Category 7 employee commuting" },
                   ].map((item, idx) => (
                     <div key={idx} className="flex items-start gap-3">
@@ -689,6 +703,7 @@ export default function Home() {
                     ["Ferry", "0.019–0.025 kg/pkm — Norled/Fjord1 fleet data 2023"],
                     ["Flight", "0.255 kg/pkm incl. IPCC radiative forcing ×1.9"],
                     ["Road distance", "OSRM routing engine (OpenStreetMap) — accounts for E39 ferry crossings"],
+                    ["Past dates", "If departure is in the past, the nearest future same-weekday is used — valid for CSRD annual reporting"],
                     ["Car assumption", "Solo driver (1 person). Public transport factors already include average vehicle occupancy — you pay your share of shared emissions."],
                   ].map(([label, value], idx) => (
                     <div key={idx} className="flex justify-between text-xs gap-4">

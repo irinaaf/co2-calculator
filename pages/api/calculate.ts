@@ -6,6 +6,7 @@ import {
   calcJourneyResult,
   MODES,
   type JourneyResult,
+  type CarVariant,
 } from "@/lib/emissions";
 
 // ─────────────────────────────────────────────────────────────────
@@ -62,16 +63,6 @@ export interface Scenario {
   /** For car/combined: simple per-mode results */
   carVariants?: CarVariant[];
   bicycleRoute?: BicycleScenario;
-}
-
-export interface CarVariant {
-  label: string;   // "EV (electric)", "Petrol"
-  emoji: string;
-  co2Kg: number;
-  annualCo2Kg: number;
-  costNok: number;
-  durationMinutes: number;
-  color: string;
 }
 
 export interface BicycleScenario {

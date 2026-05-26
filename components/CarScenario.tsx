@@ -1,5 +1,5 @@
 import { Car, Bike, PersonStanding, Zap, Fuel } from "lucide-react";
-import type { CarVariant } from "@/pages/api/calculate";
+import type { CarVariant } from "@/lib/emissions";
 import { formatCo2, formatDuration } from "@/lib/emissions";
 
 interface Props {
