@@ -150,7 +150,7 @@ When a past departure time is entered, the calculator automatically queries Entu
 
 | Item | Status |
 |---|---|
-| Ferry CO₂ for a car carried on the ferry | Shown as a reference note in the car section — not added to the route total. OSRM routing treats ferry crossings as road segments; adding vehicle-carrying ferry emissions separately would require vessel-specific capacity data not available in open APIs. |
+| Ferry CO₂ for a car carried on the ferry | Shown as a separate informational panel when a ferry crossing is detected on the route — not added to the route total. OSRM routing treats ferry crossings as road segments; adding vehicle-carrying ferry emissions separately would require vessel-specific capacity data not available in open APIs. |
 | Infrastructure emissions (building roads, tracks) | Not included — consistent with standard GHG Protocol Scope 3 Cat. 7 methodology |
 | Vehicle manufacturing emissions | Not included — scope limited to operational (tailpipe + upstream electricity) emissions |
 
