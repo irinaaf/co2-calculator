@@ -145,7 +145,9 @@ export async function geocodeAutocomplete(
 
 export async function geocodeOne(query: string): Promise<GeoFeature> {
   const results = await geocodeAutocomplete(query, 1);
-  if (!results.length) throw new Error(`Location not found: "${query}"`);
+  if (!results.length) throw new Error(
+    `Could not find location: "${query}". Try a more specific address, a nearby town name, or a transit stop name.`
+  );
   return results[0];
 }
 
