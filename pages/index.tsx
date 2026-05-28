@@ -244,6 +244,19 @@ export default function Home() {
         <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
         <meta name="description" content="Compare CO₂ emissions for train, bus, ferry and car between Norwegian locations. CSRD scope 3 export." />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        {/* Open Graph */}
+        <meta property="og:type"        content="website" />
+        <meta property="og:url"         content="https://co2-calculator.afanasev.no/" />
+        <meta property="og:title"       content="CO₂ Route Calculator — Norway" />
+        <meta property="og:description" content="Compare emissions across all transport modes — real Entur timetables, operator-specific CO₂ factors, CSRD Scope 3 export." />
+        <meta property="og:image"       content="https://co2-calculator.afanasev.no/api/og" />
+        <meta property="og:image:width"  content="1200" />
+        <meta property="og:image:height" content="630" />
+        {/* Twitter / X */}
+        <meta name="twitter:card"        content="summary_large_image" />
+        <meta name="twitter:title"       content="CO₂ Route Calculator — Norway" />
+        <meta name="twitter:description" content="Compare emissions across all transport modes — real Entur timetables, operator-specific CO₂ factors, CSRD Scope 3 export." />
+        <meta name="twitter:image"       content="https://co2-calculator.afanasev.no/api/og" />
       </Head>
 
       <div className="min-h-screen" style={{ background: "hsl(34,20%,96%)" }}>
